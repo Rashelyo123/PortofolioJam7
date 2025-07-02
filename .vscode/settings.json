@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "PortofolioJam_Rogulike.sln"
+    "dotnet.defaultSolution": "PortofolioJam7.sln"
 }
