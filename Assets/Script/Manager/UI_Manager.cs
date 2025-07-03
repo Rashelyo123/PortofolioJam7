@@ -3,7 +3,6 @@ using UnityEngine.UI;
 using System.Collections;
 using TMPro;
 
-// Main UI Manager
 public class UIManager : MonoBehaviour
 {
     [Header("UI Panels")]
@@ -11,11 +10,11 @@ public class UIManager : MonoBehaviour
     public GameObject gameUIPanel;
     public GameObject pauseMenuPanel;
     public GameObject gameOverPanel;
-    public GameObject levelUpPanel;
+    // public GameObject levelUpPanel;
 
     [Header("Game UI Elements")]
     public Slider healthBar;
-    public Slider xpBar;
+    public Slider xpBar;           // ✅ Hanya UIManager yang punya referensi ini
     public TextMeshProUGUI levelText;
     public TextMeshProUGUI timerText;
     public TextMeshProUGUI killCountText;
@@ -65,13 +64,21 @@ public class UIManager : MonoBehaviour
         // Setup button listeners
         SetupButtonListeners();
 
+        // Subscribe to events
+        SetupEventListeners();
+
         // Start with game UI
         ShowGameUI();
+    }
 
-        // Subscribe to events
+    void SetupEventListeners()
+    {
         if (experienceManager != null)
         {
-            experienceManager.OnLevelUp += OnPlayerLevelUp;
+            // ✅ Listen ke events dari ExperienceManager
+            // experienceManager.OnLevelUp += OnPlayerLevelUp;
+            experienceManager.OnXPProgressChanged += UpdateXPBar;
+            experienceManager.OnLevelChanged += UpdateLevelText;
         }
     }
 
@@ -122,17 +129,7 @@ public class UIManager : MonoBehaviour
             healthBar.value = playerHealth.GetCurrentHealth() / playerHealth.GetMaxHealth();
         }
 
-        // Update XP bar
-        if (xpBar != null && experienceManager != null)
-        {
-            xpBar.value = experienceManager.GetCurrentXP() / experienceManager.GetXPRequired();
-        }
-
-        // Update level text
-        if (levelText != null && experienceManager != null)
-        {
-            levelText.text = $"Level {experienceManager.GetCurrentLevel()}";
-        }
+        // ✅ XP bar dan level text diupdate via events, tidak perlu di sini lagi
 
         // Update timer
         if (timerText != null)
@@ -151,6 +148,23 @@ public class UIManager : MonoBehaviour
         if (waveText != null && enemySpawner != null)
         {
             waveText.text = $"Wave {enemySpawner.GetCurrentWave()}";
+        }
+    }
+
+    // ✅ Event handlers untuk XP system
+    void UpdateXPBar(float progress)
+    {
+        if (xpBar != null)
+        {
+            xpBar.value = progress;
+        }
+    }
+
+    void UpdateLevelText(int level)
+    {
+        if (levelText != null)
+        {
+            levelText.text = $"Level {level}";
         }
     }
 
@@ -216,11 +230,11 @@ public class UIManager : MonoBehaviour
             finalLevelText.text = $"Level Reached: {experienceManager.GetCurrentLevel()}";
     }
 
-    public void ShowLevelUp()
-    {
-        SetPanelActive(levelUpPanel);
-        Time.timeScale = 0f;
-    }
+    // public void ShowLevelUp()
+    // {
+    //     SetPanelActive(levelUpPanel);
+    //     Time.timeScale = 0f;
+    // }
 
     public void HideLevelUp()
     {
@@ -235,7 +249,7 @@ public class UIManager : MonoBehaviour
         if (gameUIPanel != null) gameUIPanel.SetActive(false);
         if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
-        if (levelUpPanel != null) levelUpPanel.SetActive(false);
+        // if (levelUpPanel != null) levelUpPanel.SetActive(false);
 
         // Show target panel
         if (activePanel != null)
@@ -243,10 +257,10 @@ public class UIManager : MonoBehaviour
     }
 
     // Event handlers
-    void OnPlayerLevelUp(int newLevel)
-    {
-        ShowLevelUp();
-    }
+    // void OnPlayerLevelUp(int newLevel)
+    // {
+    //     ShowLevelUp();
+    // }
 
     public void OnEnemyKilled()
     {
@@ -280,5 +294,16 @@ public class UIManager : MonoBehaviour
     public bool IsPaused()
     {
         return isPaused;
+    }
+
+    void OnDestroy()
+    {
+        // ✅ Unsubscribe dari events untuk mencegah memory leak
+        if (experienceManager != null)
+        {
+            // experienceManager.OnLevelUp -= OnPlayerLevelUp;
+            experienceManager.OnXPProgressChanged -= UpdateXPBar;
+            experienceManager.OnLevelChanged -= UpdateLevelText;
+        }
     }
 }

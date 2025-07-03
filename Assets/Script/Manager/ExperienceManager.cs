@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
 
 public class ExperienceManager : MonoBehaviour
@@ -11,9 +10,7 @@ public class ExperienceManager : MonoBehaviour
     public float xpGrowthRate = 1.5f;
     public int maxLevel = 100;
 
-    [Header("UI References")]
-    public UnityEngine.UI.Slider xpBar;
-    public TextMeshProUGUI levelText;
+    [Header("Level Up Panel")]
     public GameObject levelUpPanel;
     public Transform upgradeButtonParent;
     public GameObject upgradeButtonPrefab;
@@ -23,14 +20,19 @@ public class ExperienceManager : MonoBehaviour
     private float currentXP = 0f;
     private float xpRequiredForNextLevel;
 
-    // Events
+    // Events - UI akan listen ke events ini
     public System.Action<int> OnLevelUp;
     public System.Action<float> OnXPGained;
+    public System.Action<float> OnXPProgressChanged;  // ✅ Event untuk XP bar progress
+    public System.Action<int> OnLevelChanged;         // ✅ Event untuk level text
 
     void Start()
     {
         CalculateXPRequired();
-        UpdateUI();
+
+        // Trigger initial UI update
+        OnXPProgressChanged?.Invoke(currentXP / xpRequiredForNextLevel);
+        OnLevelChanged?.Invoke(currentLevel);
 
         // Hide level up panel initially
         if (levelUpPanel != null)
@@ -48,7 +50,8 @@ public class ExperienceManager : MonoBehaviour
             LevelUp();
         }
 
-        UpdateUI();
+        // Update UI via events
+        OnXPProgressChanged?.Invoke(currentXP / xpRequiredForNextLevel);
     }
 
     void LevelUp()
@@ -57,7 +60,10 @@ public class ExperienceManager : MonoBehaviour
         currentLevel++;
 
         CalculateXPRequired();
+
+        // Trigger events
         OnLevelUp?.Invoke(currentLevel);
+        OnLevelChanged?.Invoke(currentLevel);
 
         // Show upgrade selection
         ShowUpgradeSelection();
@@ -68,20 +74,6 @@ public class ExperienceManager : MonoBehaviour
     void CalculateXPRequired()
     {
         xpRequiredForNextLevel = baseXPRequired * Mathf.Pow(xpGrowthRate, currentLevel - 1);
-    }
-
-    void UpdateUI()
-    {
-        if (xpBar != null)
-        {
-            float xpProgress = currentXP / xpRequiredForNextLevel;
-            xpBar.value = xpProgress;
-        }
-
-        if (levelText != null)
-        {
-            levelText.text = $"Level {currentLevel}";
-        }
     }
 
     void ShowUpgradeSelection()
@@ -230,6 +222,7 @@ public class ExperienceManager : MonoBehaviour
     public float GetCurrentXP() { return currentXP; }
     public float GetXPRequired() { return xpRequiredForNextLevel; }
 }
+
 [System.Serializable]
 public class UpgradeData
 {

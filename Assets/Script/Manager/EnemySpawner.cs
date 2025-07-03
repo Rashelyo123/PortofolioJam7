@@ -4,15 +4,16 @@ using System.Collections;
 public class EnemySpawner : MonoBehaviour
 {
     [Header("Spawn Settings")]
-    public GameObject[] enemyPrefabs; // Array different enemy types
+    public GameObject[] enemyPrefabs;
+    public GameObject[] bossPrefabs;
     public Transform player;
-    public float spawnRate = 2f; // enemies per second
+    public float spawnRate = 2f;
     public int maxEnemiesOnScreen = 50;
-    public float spawnDistance = 12f; // distance from player to spawn
+    public float spawnDistance = 12f;
 
     [Header("Wave Settings")]
     public bool useWaveProgression = true;
-    public float waveInterval = 30f; // seconds between waves
+    public float waveInterval = 30f;
     public float difficultyMultiplier = 1.1f; // increase per wave
 
     [Header("Spawn Area")]
@@ -27,7 +28,7 @@ public class EnemySpawner : MonoBehaviour
     {
         gameStartTime = Time.time;
 
-        // Auto-find player jika belum di-assign
+
         if (player == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
@@ -35,7 +36,7 @@ public class EnemySpawner : MonoBehaviour
                 player = playerObj.transform;
         }
 
-        // Auto-find camera jika belum di-assign
+
         if (gameCamera == null)
             gameCamera = Camera.main;
 
@@ -84,6 +85,8 @@ public class EnemySpawner : MonoBehaviour
             StartCoroutine(TrackEnemyDeath(enemy));
         }
     }
+
+
 
     Vector3 GetRandomSpawnPosition()
     {

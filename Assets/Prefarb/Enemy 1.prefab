@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 5314830872322264478}
   - component: {fileID: 2491683838256200108}
   m_Layer: 0
-  m_Name: Enemy
+  m_Name: Enemy 1
   m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -77,7 +77,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_Sprite: {fileID: -9095717837082945937, guid: 207ee8102dd4143d288186ef0be518ee, type: 3}
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Color: {r: 0.18243408, g: 0, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -102,7 +102,7 @@ MonoBehaviour:
   maxHealth: 3
   moveSpeed: 2
   damage: 1
-  enemyData: {fileID: 11400000, guid: 86ce5de52b78d724eb44ddbf94ecdb22, type: 2}
+  enemyData: {fileID: 11400000, guid: fa6f590e30a22a04d9a3c8f07470cad8, type: 2}
   xpOrbPrefab: {fileID: 418468786614460648, guid: 35add0a6e97e8414c937e4db625850c5, type: 3}
   maxDistanceFromPlayer: 20
 --- !u!70 &5314830872322264478

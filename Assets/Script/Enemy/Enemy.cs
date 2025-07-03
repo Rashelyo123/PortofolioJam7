@@ -8,6 +8,7 @@ public class Enemy : MonoBehaviour
     public float maxHealth = 3f;
     public float moveSpeed = 2f;
     public float damage = 1f;
+    [SerializeField] private EnemyData enemyData;
 
     [Space]
     [SerializeField] private GameObject xpOrbPrefab;
@@ -22,7 +23,20 @@ public class Enemy : MonoBehaviour
 
     void Start()
     {
-        currentHealth = maxHealth;
+        // Pastikan enemyData ada
+        if (enemyData != null)
+        {
+            currentHealth = enemyData.maxHealth;
+            maxHealth = enemyData.maxHealth;
+            moveSpeed = enemyData.moveSpeed;
+            damage = enemyData.damage;
+        }
+        else
+        {
+            currentHealth = maxHealth;
+        }
+
+        // Initialize components
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         rb.gravityScale = 0f;
@@ -34,7 +48,6 @@ public class Enemy : MonoBehaviour
             player = playerObj.transform;
         }
 
-        // Start cleanup check
         StartCoroutine(CheckDistanceFromPlayer());
     }
 
@@ -61,6 +74,8 @@ public class Enemy : MonoBehaviour
     public void TakeDamage(float damageAmount)
     {
         currentHealth -= damageAmount;
+        Vector3 textPosition = transform.position + Vector3.up * 1.5f;
+        FloatingText.Create(damageAmount.ToString(), textPosition, Color.red);
 
         // Visual feedback
         StartCoroutine(FlashRed());
@@ -73,14 +88,21 @@ public class Enemy : MonoBehaviour
 
     void Die()
     {
-        // Spawn XP Orb
-        UIManager uiManager = GameObject.FindAnyObjectByType<UIManager>();
-        if (xpOrbPrefab != null)
+        UIManager uiManager = FindObjectOfType<UIManager>();
+        if (uiManager != null)
         {
-            Instantiate(xpOrbPrefab, transform.position, Quaternion.identity);
             uiManager.OnEnemyKilled();
         }
 
+        {
+            if (xpOrbPrefab != null)
+            {
+                GameObject orb = Instantiate(xpOrbPrefab, transform.position, Quaternion.identity);
+                XPOrb orbScript = orb.GetComponent<XPOrb>();
+                orbScript.xpValue = enemyData.xpDropAmount;
+            }
+            // ... kode existing ...
+        }
         Destroy(gameObject);
     }
 
@@ -124,8 +146,7 @@ public class Enemy : MonoBehaviour
             Debug.Log("Player hit by enemy!");
             PlayerHealth playerHealth = other.GetComponent<PlayerHealth>();
             playerHealth?.TakeDamage(10f);
-            // Optional: destroy enemy setelah hit player
-            // Destroy(gameObject);
+
         }
     }
 }
