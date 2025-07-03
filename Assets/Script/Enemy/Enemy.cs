@@ -74,10 +74,11 @@ public class Enemy : MonoBehaviour
     void Die()
     {
         // Spawn XP Orb
-
+        UIManager uiManager = GameObject.FindAnyObjectByType<UIManager>();
         if (xpOrbPrefab != null)
         {
             Instantiate(xpOrbPrefab, transform.position, Quaternion.identity);
+            uiManager.OnEnemyKilled();
         }
 
         Destroy(gameObject);
@@ -121,7 +122,8 @@ public class Enemy : MonoBehaviour
         {
             // Player damage system akan kita buat nanti
             Debug.Log("Player hit by enemy!");
-
+            PlayerHealth playerHealth = other.GetComponent<PlayerHealth>();
+            playerHealth?.TakeDamage(10f);
             // Optional: destroy enemy setelah hit player
             // Destroy(gameObject);
         }

@@ -1,13 +1,15 @@
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 using System.Collections.Generic;
 
 
 public class UpgradeButton : MonoBehaviour
 {
     [Header("UI Components")]
-    public UnityEngine.UI.Text nameText;
-    public UnityEngine.UI.Text descriptionText;
-    public UnityEngine.UI.Button button;
+    public TextMeshProUGUI nameText;
+    public TextMeshProUGUI descriptionText;
+    public Button button;
 
     private UpgradeData upgradeData;
     private ExperienceManager experienceManager;

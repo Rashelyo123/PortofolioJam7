@@ -53,8 +53,11 @@ public class PlayerHealth : MonoBehaviour
 
     void Die()
     {
-        Debug.Log("Player Died! Game Over");
-        // Implement game over logic
+        UIManager uiManager = FindObjectOfType<UIManager>();
+        if (uiManager != null)
+        {
+            uiManager.OnPlayerDied();
+        }
         Time.timeScale = 0f;
     }
 
