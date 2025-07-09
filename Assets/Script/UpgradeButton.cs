@@ -6,34 +6,33 @@ using System.Collections.Generic;
 
 public class UpgradeButton : MonoBehaviour
 {
-    [Header("UI Components")]
-    public TextMeshProUGUI nameText;
-    public TextMeshProUGUI descriptionText;
-    public Button button;
+    [Header("UI References")]
+    public TMPro.TextMeshProUGUI upgradeName;
+    public TMPro.TextMeshProUGUI upgradeDescription;
+    public UnityEngine.UI.Button button;
 
     private UpgradeData upgradeData;
     private ExperienceManager experienceManager;
 
-    public void Setup(UpgradeData upgrade, ExperienceManager expManager)
+    public void Setup(UpgradeData data, ExperienceManager manager)
     {
-        upgradeData = upgrade;
-        experienceManager = expManager;
+        upgradeData = data;
+        experienceManager = manager;
 
-        if (nameText != null)
-            nameText.text = upgrade.name;
+        if (upgradeName != null)
+            upgradeName.text = data.name;
 
-        if (descriptionText != null)
-            descriptionText.text = upgrade.description;
+        if (upgradeDescription != null)
+            upgradeDescription.text = data.description;
 
         if (button != null)
+        {
             button.onClick.AddListener(OnButtonClick);
+        }
     }
 
     void OnButtonClick()
     {
-        if (experienceManager != null)
-        {
-            experienceManager.SelectUpgrade(upgradeData);
-        }
+        experienceManager.SelectUpgrade(upgradeData);
     }
 }

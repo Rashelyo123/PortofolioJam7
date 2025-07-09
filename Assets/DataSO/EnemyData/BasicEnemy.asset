@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: BasicEnemy
   m_EditorClassIdentifier: 
   maxHealth: 1
-  moveSpeed: 5
+  moveSpeed: 1
   damage: 1
   xpDropAmount: 1

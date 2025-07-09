@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public class EnemySpawner : MonoBehaviour
 {
@@ -14,10 +15,17 @@ public class EnemySpawner : MonoBehaviour
     [Header("Wave Settings")]
     public bool useWaveProgression = true;
     public float waveInterval = 30f;
-    public float difficultyMultiplier = 1.1f; // increase per wave
+    public float difficultyMultiplier = 1.1f;
+
+    [Header("Object Pooling")]
+    public int initialPoolSize = 100;
 
     [Header("Spawn Area")]
     public Camera gameCamera;
+
+    // Object pools untuk setiap enemy type
+    private Dictionary<GameObject, ObjectPool<Enemy>> enemyPools = new Dictionary<GameObject, ObjectPool<Enemy>>();
+    private List<Enemy> activeEnemies = new List<Enemy>();
 
     private float nextSpawnTime = 0f;
     private int currentEnemyCount = 0;
@@ -28,7 +36,7 @@ public class EnemySpawner : MonoBehaviour
     {
         gameStartTime = Time.time;
 
-
+        // Initialize player reference
         if (player == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
@@ -36,15 +44,41 @@ public class EnemySpawner : MonoBehaviour
                 player = playerObj.transform;
         }
 
-
+        // Initialize camera reference
         if (gameCamera == null)
             gameCamera = Camera.main;
+
+        // Initialize object pools
+        InitializeObjectPools();
 
         // Start spawning
         StartCoroutine(SpawnEnemies());
 
         if (useWaveProgression)
             StartCoroutine(WaveProgression());
+    }
+
+    void InitializeObjectPools()
+    {
+        // Buat pool untuk setiap enemy type
+        foreach (GameObject enemyPrefab in enemyPrefabs)
+        {
+            if (enemyPrefab != null)
+            {
+                ObjectPool<Enemy> pool = new ObjectPool<Enemy>(enemyPrefab, initialPoolSize);
+                enemyPools[enemyPrefab] = pool;
+            }
+        }
+
+        // Buat pool untuk boss (opsional)
+        foreach (GameObject bossPrefab in bossPrefabs)
+        {
+            if (bossPrefab != null)
+            {
+                ObjectPool<Enemy> pool = new ObjectPool<Enemy>(bossPrefab, 5); // Boss pool lebih kecil
+                enemyPools[bossPrefab] = pool;
+            }
+        }
     }
 
     IEnumerator SpawnEnemies()
@@ -55,7 +89,6 @@ public class EnemySpawner : MonoBehaviour
             if (currentEnemyCount < maxEnemiesOnScreen && enemyPrefabs.Length > 0)
             {
                 SpawnEnemy();
-                currentEnemyCount++;
             }
 
             // Wait berdasarkan spawn rate
@@ -71,22 +104,27 @@ public class EnemySpawner : MonoBehaviour
         // Pilih random enemy type
         GameObject enemyPrefab = enemyPrefabs[Random.Range(0, enemyPrefabs.Length)];
 
-        // Get spawn position di luar screen
-        Vector3 spawnPosition = GetRandomSpawnPosition();
-
-        // Spawn enemy
-        GameObject enemy = Instantiate(enemyPrefab, spawnPosition, Quaternion.identity);
-
-        // Subscribe ke event death untuk mengurangi counter
-        Enemy enemyScript = enemy.GetComponent<Enemy>();
-        if (enemyScript != null)
+        // Get enemy dari pool
+        if (enemyPools.ContainsKey(enemyPrefab))
         {
-            // Modify Enemy script untuk call back saat mati
-            StartCoroutine(TrackEnemyDeath(enemy));
+            Enemy enemy = enemyPools[enemyPrefab].Get();
+
+            // Set spawn position
+            Vector3 spawnPosition = GetRandomSpawnPosition();
+            enemy.transform.position = spawnPosition;
+            enemy.transform.rotation = Quaternion.identity;
+
+            // Reset enemy state (jika perlu)
+            enemy.ResetEnemy();
+
+            // Add ke active enemies list
+            activeEnemies.Add(enemy);
+            currentEnemyCount++;
+
+            // Set spawner reference untuk return ke pool
+            enemy.SetSpawner(this);
         }
     }
-
-
 
     Vector3 GetRandomSpawnPosition()
     {
@@ -102,16 +140,44 @@ public class EnemySpawner : MonoBehaviour
         return spawnPosition;
     }
 
-    IEnumerator TrackEnemyDeath(GameObject enemy)
+    // Method dipanggil dari Enemy script saat mati
+    public void ReturnEnemyToPool(Enemy enemy)
     {
-        // Wait sampai enemy destroyed
-        while (enemy != null)
+        if (activeEnemies.Contains(enemy))
         {
-            yield return null;
-        }
+            activeEnemies.Remove(enemy);
+            currentEnemyCount--;
 
-        // Kurangi counter saat enemy mati
-        currentEnemyCount--;
+            // Cari pool yang tepat untuk enemy ini
+            foreach (var kvp in enemyPools)
+            {
+                if (enemy.name.Contains(kvp.Key.name.Replace("(Clone)", "")))
+                {
+                    kvp.Value.Return(enemy);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Method untuk spawn boss
+    public void SpawnBoss()
+    {
+        if (bossPrefabs.Length == 0 || player == null) return;
+
+        GameObject bossPrefab = bossPrefabs[Random.Range(0, bossPrefabs.Length)];
+
+        if (enemyPools.ContainsKey(bossPrefab))
+        {
+            Enemy boss = enemyPools[bossPrefab].Get();
+            boss.transform.position = GetRandomSpawnPosition();
+            boss.transform.rotation = Quaternion.identity;
+            boss.ResetEnemy();
+            boss.SetSpawner(this);
+
+            activeEnemies.Add(boss);
+            currentEnemyCount++;
+        }
     }
 
     IEnumerator WaveProgression()
@@ -127,8 +193,38 @@ public class EnemySpawner : MonoBehaviour
             spawnRate *= difficultyMultiplier;
             maxEnemiesOnScreen = Mathf.RoundToInt(maxEnemiesOnScreen * difficultyMultiplier);
 
+            // Spawn boss setiap 5 wave
+            if (currentWave % 5 == 0)
+            {
+                SpawnBoss();
+            }
+
             // Optional: Show wave notification
             Debug.Log($"Wave {currentWave}! Spawn Rate: {spawnRate:F1}, Max Enemies: {maxEnemiesOnScreen}");
+        }
+    }
+
+    // Cleanup method untuk performance
+    void Update()
+    {
+        // Cleanup enemies yang terlalu jauh dari player
+        CleanupDistantEnemies();
+    }
+
+    void CleanupDistantEnemies()
+    {
+        float cleanupDistance = spawnDistance * 2f; // Double spawn distance
+
+        for (int i = activeEnemies.Count - 1; i >= 0; i--)
+        {
+            if (activeEnemies[i] != null && player != null)
+            {
+                float distance = Vector3.Distance(activeEnemies[i].transform.position, player.position);
+                if (distance > cleanupDistance)
+                {
+                    ReturnEnemyToPool(activeEnemies[i]);
+                }
+            }
         }
     }
 
@@ -148,6 +244,11 @@ public class EnemySpawner : MonoBehaviour
         return currentEnemyCount;
     }
 
+    public int GetActiveEnemyCount()
+    {
+        return activeEnemies.Count;
+    }
+
     // Method untuk modify spawn settings saat runtime
     public void SetSpawnRate(float newRate)
     {
@@ -159,6 +260,20 @@ public class EnemySpawner : MonoBehaviour
         maxEnemiesOnScreen = newMax;
     }
 
+    // Method untuk clear semua enemies (untuk restart game)
+    public void ClearAllEnemies()
+    {
+        for (int i = activeEnemies.Count - 1; i >= 0; i--)
+        {
+            if (activeEnemies[i] != null)
+            {
+                ReturnEnemyToPool(activeEnemies[i]);
+            }
+        }
+        activeEnemies.Clear();
+        currentEnemyCount = 0;
+    }
+
     // Debug visualization
     void OnDrawGizmosSelected()
     {
@@ -166,6 +281,9 @@ public class EnemySpawner : MonoBehaviour
         {
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(player.position, spawnDistance);
+
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(player.position, spawnDistance * 2f); // Cleanup distance
         }
     }
 }

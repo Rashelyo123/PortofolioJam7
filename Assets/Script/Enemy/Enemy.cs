@@ -10,8 +10,7 @@ public class Enemy : MonoBehaviour
     public float damage = 1f;
     [SerializeField] private EnemyData enemyData;
 
-    [Space]
-    [SerializeField] private GameObject xpOrbPrefab;
+
 
     [Header("Cleanup")]
     public float maxDistanceFromPlayer = 20f;
@@ -20,8 +19,14 @@ public class Enemy : MonoBehaviour
     private Transform player;
     private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
+    private EnemySpawner spawner; // Reference ke spawner
 
     void Start()
+    {
+        InitializeEnemy();
+    }
+
+    void InitializeEnemy()
     {
         // Pastikan enemyData ada
         if (enemyData != null)
@@ -39,16 +44,64 @@ public class Enemy : MonoBehaviour
         // Initialize components
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
-        rb.gravityScale = 0f;
+
+        if (rb != null)
+            rb.gravityScale = 0f;
 
         // Find player
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
+        if (player == null)
         {
-            player = playerObj.transform;
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                player = playerObj.transform;
+            }
+        }
+    }
+
+    // Method untuk reset enemy state saat diambil dari pool
+    public void ResetEnemy()
+    {
+        // Reset health
+        if (enemyData != null)
+        {
+            currentHealth = enemyData.maxHealth;
+        }
+        else
+        {
+            currentHealth = maxHealth;
         }
 
-        StartCoroutine(CheckDistanceFromPlayer());
+        // Reset visual
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = Color.white;
+        }
+
+        // Reset rigidbody
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+        }
+
+        // Enable gameObject jika disabled
+        gameObject.SetActive(true);
+
+        // Find player jika belum ada
+        if (player == null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                player = playerObj.transform;
+            }
+        }
+    }
+
+    // Method untuk set spawner reference
+    public void SetSpawner(EnemySpawner enemySpawner)
+    {
+        spawner = enemySpawner;
     }
 
     void FixedUpdate()
@@ -61,13 +114,18 @@ public class Enemy : MonoBehaviour
         if (player != null)
         {
             Vector2 direction = (player.position - transform.position).normalized;
-            rb.velocity = direction * moveSpeed;
+
+            // Gunakan transform movement untuk performa yang lebih baik
+            transform.position += (Vector3)(direction * moveSpeed * Time.fixedDeltaTime);
 
             // Flip sprite berdasarkan direction
-            if (direction.x > 0)
-                spriteRenderer.flipX = false;
-            else if (direction.x < 0)
-                spriteRenderer.flipX = true;
+            if (spriteRenderer != null)
+            {
+                if (direction.x > 0)
+                    spriteRenderer.flipX = false;
+                else if (direction.x < 0)
+                    spriteRenderer.flipX = true;
+            }
         }
     }
 
@@ -88,22 +146,29 @@ public class Enemy : MonoBehaviour
 
     void Die()
     {
+        // Notify UI Manager
         UIManager uiManager = FindObjectOfType<UIManager>();
         if (uiManager != null)
         {
             uiManager.OnEnemyKilled();
         }
 
+        // Spawn XP Orb menggunakan XPOrbManager
+        if (XPOrbManager.Instance != null && enemyData != null)
         {
-            if (xpOrbPrefab != null)
-            {
-                GameObject orb = Instantiate(xpOrbPrefab, transform.position, Quaternion.identity);
-                XPOrb orbScript = orb.GetComponent<XPOrb>();
-                orbScript.xpValue = enemyData.xpDropAmount;
-            }
-            // ... kode existing ...
+            XPOrbManager.Instance.SpawnXPOrb(transform.position, Mathf.RoundToInt(enemyData.xpDropAmount));
         }
-        Destroy(gameObject);
+
+        // Return to pool instead of destroying
+        if (spawner != null)
+        {
+            spawner.ReturnEnemyToPool(this);
+        }
+        else
+        {
+            // Fallback jika spawner tidak ada
+            gameObject.SetActive(false);
+        }
     }
 
     IEnumerator FlashRed()
@@ -117,36 +182,24 @@ public class Enemy : MonoBehaviour
         }
     }
 
-    IEnumerator CheckDistanceFromPlayer()
-    {
-        while (true)
-        {
-            yield return new WaitForSeconds(2f); // Check every 2 seconds
-
-            if (player != null)
-            {
-                float distance = Vector2.Distance(transform.position, player.position);
-
-                // Destroy enemy jika terlalu jauh (optimization)
-                if (distance > maxDistanceFromPlayer)
-                {
-                    Destroy(gameObject);
-                    break;
-                }
-            }
-        }
-    }
-
     void OnTriggerEnter2D(Collider2D other)
     {
         // Damage player saat collision
         if (other.CompareTag("Player"))
         {
-            // Player damage system akan kita buat nanti
             Debug.Log("Player hit by enemy!");
             PlayerHealth playerHealth = other.GetComponent<PlayerHealth>();
-            playerHealth?.TakeDamage(10f);
-
+            if (playerHealth != null)
+            {
+                playerHealth.TakeDamage(damage);
+            }
         }
+    }
+
+    // Optional: Method untuk manual cleanup jika diperlukan
+    void OnDisable()
+    {
+        // Stop all coroutines saat object disabled
+        StopAllCoroutines();
     }
 }

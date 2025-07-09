@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro;
 
+// Optimized Experience Manager dengan integrasi yang lebih baik
 public class ExperienceManager : MonoBehaviour
 {
+    public static ExperienceManager Instance;
+
     [Header("Experience Settings")]
     public float baseXPRequired = 10f;
     public float xpGrowthRate = 1.5f;
@@ -23,11 +25,37 @@ public class ExperienceManager : MonoBehaviour
     // Events - UI akan listen ke events ini
     public System.Action<int> OnLevelUp;
     public System.Action<float> OnXPGained;
-    public System.Action<float> OnXPProgressChanged;  // ✅ Event untuk XP bar progress
-    public System.Action<int> OnLevelChanged;         // ✅ Event untuk level text
+    public System.Action<float> OnXPProgressChanged;
+    public System.Action<int> OnLevelChanged;
+
+    // Cached components untuk performance
+    private PlayerController cachedPlayerController;
+    private PlayerHealth cachedPlayerHealth;
+    private BasicWeapon cachedWeapon;
+    private WeaponSelectionUI cachedWeaponUI;
+    private WeaponManager cachedWeaponManager;
+
+    // Enhanced upgrade system
+    private EnhancedUpgradeSystem upgradeSystem;
+
+    void Awake()
+    {
+        // Singleton pattern
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
+    }
 
     void Start()
     {
+        InitializeComponents();
         CalculateXPRequired();
 
         // Trigger initial UI update
@@ -39,8 +67,29 @@ public class ExperienceManager : MonoBehaviour
             levelUpPanel.SetActive(false);
     }
 
+    void InitializeComponents()
+    {
+        // Cache components untuk menghindari GetComponent() berulang
+        cachedPlayerController = FindObjectOfType<PlayerController>();
+        cachedPlayerHealth = FindObjectOfType<PlayerHealth>();
+        cachedWeapon = FindObjectOfType<BasicWeapon>();
+        cachedWeaponUI = FindObjectOfType<WeaponSelectionUI>();
+        cachedWeaponManager = FindObjectOfType<WeaponManager>();
+
+        // Initialize enhanced upgrade system
+        upgradeSystem = new EnhancedUpgradeSystem(
+            cachedPlayerController,
+            cachedPlayerHealth,
+            cachedWeapon,
+            cachedWeaponUI,
+            cachedWeaponManager
+        );
+    }
+
     public void GainXP(float amount)
     {
+        if (currentLevel >= maxLevel) return;
+
         currentXP += amount;
         OnXPGained?.Invoke(amount);
 
@@ -87,12 +136,13 @@ public class ExperienceManager : MonoBehaviour
         levelUpPanel.SetActive(true);
 
         // Generate upgrade options
-        GenerateUpgradeOptions();
+        StartCoroutine(GenerateUpgradeOptionsCoroutine());
     }
 
-    void GenerateUpgradeOptions()
+    // Menggunakan coroutine untuk menghindari frame drop
+    IEnumerator GenerateUpgradeOptionsCoroutine()
     {
-        if (upgradeButtonParent == null || upgradeButtonPrefab == null) return;
+        if (upgradeButtonParent == null || upgradeButtonPrefab == null) yield break;
 
         // Clear existing buttons
         foreach (Transform child in upgradeButtonParent)
@@ -100,8 +150,10 @@ public class ExperienceManager : MonoBehaviour
             Destroy(child.gameObject);
         }
 
+        yield return null; // Wait one frame
+
         // Get available upgrades
-        List<UpgradeData> availableUpgrades = GetAvailableUpgrades();
+        List<UpgradeData> availableUpgrades = upgradeSystem.GetAvailableUpgrades();
 
         // Create buttons for upgrades (max 3 options)
         int optionsToShow = Mathf.Min(3, availableUpgrades.Count);
@@ -109,30 +161,8 @@ public class ExperienceManager : MonoBehaviour
         for (int i = 0; i < optionsToShow; i++)
         {
             CreateUpgradeButton(availableUpgrades[i]);
+            if (i % 2 == 0) yield return null; // Spread creation across frames
         }
-    }
-
-    List<UpgradeData> GetAvailableUpgrades()
-    {
-        List<UpgradeData> upgrades = new List<UpgradeData>();
-
-        // Basic upgrades 
-        upgrades.Add(new UpgradeData("Damage Up", "Increase weapon damage by 20%", UpgradeType.Damage));
-        upgrades.Add(new UpgradeData("Fire Rate Up", "Increase fire rate by 30%", UpgradeType.FireRate));
-        upgrades.Add(new UpgradeData("Range Up", "Increase weapon range by 2", UpgradeType.Range));
-        upgrades.Add(new UpgradeData("Speed Up", "Increase movement speed by 15%", UpgradeType.Speed));
-        upgrades.Add(new UpgradeData("Health Up", "Increase max health by 20", UpgradeType.Health));
-
-        // Shuffle for variety
-        for (int i = 0; i < upgrades.Count; i++)
-        {
-            UpgradeData temp = upgrades[i];
-            int randomIndex = Random.Range(i, upgrades.Count);
-            upgrades[i] = upgrades[randomIndex];
-            upgrades[randomIndex] = temp;
-        }
-
-        return upgrades;
     }
 
     void CreateUpgradeButton(UpgradeData upgrade)
@@ -148,8 +178,8 @@ public class ExperienceManager : MonoBehaviour
 
     public void SelectUpgrade(UpgradeData upgrade)
     {
-        // Apply upgrade
-        ApplyUpgrade(upgrade);
+        // Apply upgrade melalui upgrade system
+        upgradeSystem.ApplyUpgrade(upgrade);
 
         // Hide panel and resume game
         if (levelUpPanel != null)
@@ -158,91 +188,9 @@ public class ExperienceManager : MonoBehaviour
         Time.timeScale = 1f;
     }
 
-    void ApplyUpgrade(UpgradeData upgrade)
-    {
-        switch (upgrade.type)
-        {
-            case UpgradeType.Damage:
-                ApplyDamageUpgrade();
-                break;
-            case UpgradeType.FireRate:
-                ApplyFireRateUpgrade();
-                break;
-            case UpgradeType.Range:
-                ApplyRangeUpgrade();
-                break;
-            case UpgradeType.Speed:
-                ApplySpeedUpgrade();
-                break;
-            case UpgradeType.Health:
-                ApplyHealthUpgrade();
-                break;
-        }
-
-        Debug.Log($"Applied upgrade: {upgrade.name}");
-    }
-
-    void ApplyDamageUpgrade()
-    {
-        BasicWeapon weapon = GetComponentInChildren<BasicWeapon>();
-        if (weapon != null)
-            weapon.UpgradeDamage(1.2f);
-    }
-
-    void ApplyFireRateUpgrade()
-    {
-        BasicWeapon weapon = GetComponentInChildren<BasicWeapon>();
-        if (weapon != null)
-            weapon.UpgradeFireRate(1.3f);
-    }
-
-    void ApplyRangeUpgrade()
-    {
-        BasicWeapon weapon = GetComponentInChildren<BasicWeapon>();
-        if (weapon != null)
-            weapon.UpgradeRange(2f);
-    }
-
-    void ApplySpeedUpgrade()
-    {
-        PlayerController playerController = GetComponent<PlayerController>();
-        if (playerController != null)
-            playerController.moveSpeed *= 1.15f;
-    }
-
-    void ApplyHealthUpgrade()
-    {
-        PlayerHealth playerHealth = GetComponent<PlayerHealth>();
-        if (playerHealth != null)
-            playerHealth.IncreaseMaxHealth(20f);
-    }
-
     // Public getters
     public int GetCurrentLevel() { return currentLevel; }
     public float GetCurrentXP() { return currentXP; }
     public float GetXPRequired() { return xpRequiredForNextLevel; }
-}
-
-[System.Serializable]
-public class UpgradeData
-{
-    public string name;
-    public string description;
-    public UpgradeType type;
-
-    public UpgradeData(string n, string desc, UpgradeType t)
-    {
-        name = n;
-        description = desc;
-        type = t;
-    }
-}
-
-public enum UpgradeType
-{
-    Damage,
-    FireRate,
-    Range,
-    Speed,
-    Health
+    public float GetXPProgress() { return currentXP / xpRequiredForNextLevel; }
 }
